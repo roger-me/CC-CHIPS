@@ -40,7 +40,6 @@ FG_RIGHT="\033[38;2;70;21;31m"
 BG_RIGHT="\033[48;2;70;21;31m"
 FG_RIGHT_TEXT="\033[38;2;247;80;74m"
 
-FG_YELLOW="\033[33m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
@@ -138,7 +137,7 @@ printf "${FG_LEFT}${CAP_RIGHT}${RESET}"
 if [ -n "$git_branch" ]; then
     printf " "
     printf "${FG_MID}${CAP_LEFT}${RESET}"
-    printf "${BG_MID}${BOLD}${FG_MID_TEXT} ${ICON_GITHUB} ${ICON_BRANCH} %s${FG_YELLOW}%s${FG_MID_TEXT} ${RESET}" "$git_branch" "$git_dirty"
+    printf "${BG_MID}${BOLD}${FG_MID_TEXT} ${ICON_GITHUB} ${ICON_BRANCH} %s${FG_MID_TEXT}%s${FG_MID_TEXT} ${RESET}" "$git_branch" "$git_dirty"
     printf "${FG_MID}${CAP_RIGHT}${RESET}"
 fi
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# CC CHIPS — 8-bit Theme
-# Retro color palette with Nerd Font icons
+# Chip-style Status Line for Claude Code
+# Rounded pills using Powerline glyphs + emoji icons
 
 input=$(cat)
 
@@ -22,22 +22,23 @@ ICON_MONITOR=$(printf '\xef\x8b\x90')       # U+F2D0  fa-window_maximize
 ICON_DOLLAR=$(printf '\xee\xb7\xa8')         # U+EDE8  fa-coins
 
 # ═══════════════════════════════════════════════════════════════════
-# COLORS — 8-bit retro palette
-# Chip 1: #C41665 (pink)    text #DDDDDD
-# Chip 2: #E2E0E5 (light)   text #000000
-# Chip 3: #9CC02A (lime)    text #000000
+# COLORS — Claude theme
 # ═══════════════════════════════════════════════════════════════════
-FG_CHIP1="\033[38;2;196;22;101m"
-BG_CHIP1="\033[48;2;196;22;101m"
-FG_CHIP1_TEXT="\033[38;2;221;221;221m"
+# Left chip:   bg #2D2E29, text #C6613F
+# Middle chip: bg #FFFFFF, text #2E3440
+# Right chip:  bg #C6613F, text #FFFFFF
 
-FG_CHIP2="\033[38;2;226;224;229m"
-BG_CHIP2="\033[48;2;226;224;229m"
-FG_CHIP2_TEXT="\033[38;2;0;0;0m"
+FG_LEFT="\033[38;2;31;30;29m"
+BG_LEFT="\033[48;2;31;30;29m"
+FG_LEFT_TEXT="\033[38;2;198;97;63m"
 
-FG_CHIP3="\033[38;2;156;192;42m"
-BG_CHIP3="\033[48;2;156;192;42m"
-FG_CHIP3_TEXT="\033[38;2;0;0;0m"
+FG_MID="\033[38;2;255;255;255m"
+BG_MID="\033[48;2;255;255;255m"
+FG_MID_TEXT="\033[38;2;46;52;64m"
+
+FG_RIGHT="\033[38;2;198;97;63m"
+BG_RIGHT="\033[48;2;198;97;63m"
+FG_RIGHT_TEXT="\033[38;2;255;255;255m"
 
 BOLD="\033[1m"
 RESET="\033[0m"
@@ -127,24 +128,24 @@ fi
 # BUILD STATUS LINE
 # ═══════════════════════════════════════════════════════════════════
 
-# CHIP 1: Pink pill (#C41665) — folder + path
-printf "${FG_CHIP1}${CAP_LEFT}${RESET}"
-printf "${BG_CHIP1}${BOLD}${FG_CHIP1_TEXT} ${ICON_FOLDER} %s ${RESET}" "$short_path"
-printf "${FG_CHIP1}${CAP_RIGHT}${RESET}"
+# CHIP 1: Polar night (#2E3440 bg, #88C0D0 frost text) — folder + path
+printf "${FG_LEFT}${CAP_LEFT}${RESET}"
+printf "${BG_LEFT}${BOLD}${FG_LEFT_TEXT} ${ICON_FOLDER} %s ${RESET}" "$short_path"
+printf "${FG_LEFT}${CAP_RIGHT}${RESET}"
 
-# CHIP 2: Light pill (#E2E0E5) — git info
+# CHIP 2: Snow storm (#D8DEE9 bg, #2E3440 text) — git info
 if [ -n "$git_branch" ]; then
     printf " "
-    printf "${FG_CHIP2}${CAP_LEFT}${RESET}"
-    printf "${BG_CHIP2}${BOLD}${FG_CHIP2_TEXT} ${ICON_GITHUB} ${ICON_BRANCH} %s${FG_CHIP2_TEXT}%s${FG_CHIP2_TEXT} ${RESET}" "$git_branch" "$git_dirty"
-    printf "${FG_CHIP2}${CAP_RIGHT}${RESET}"
+    printf "${FG_MID}${CAP_LEFT}${RESET}"
+    printf "${BG_MID}${BOLD}${FG_MID_TEXT} ${ICON_GITHUB} ${ICON_BRANCH} %s${FG_MID_TEXT}%s${FG_MID_TEXT} ${RESET}" "$git_branch" "$git_dirty"
+    printf "${FG_MID}${CAP_RIGHT}${RESET}"
 fi
 
 printf " "
 
-# CHIP 3: Lime pill (#9CC02A) — model + context + cost
-printf "${FG_CHIP3}${CAP_LEFT}${RESET}"
-printf "${BG_CHIP3}${BOLD}${FG_CHIP3_TEXT} ${ICON_BRAIN} %s ${ICON_MONITOR} %s %d%% ${ICON_DOLLAR} %s ${RESET}" "$model_display" "$bar" "$context_pct" "$cost_display"
-printf "${FG_CHIP3}${CAP_RIGHT}${RESET}"
+# CHIP 3: Steel blue (#5E81AC bg, #ECEFF4 snow text) — brain + model + context + cost
+printf "${FG_RIGHT}${CAP_LEFT}${RESET}"
+printf "${BG_RIGHT}${BOLD}${FG_RIGHT_TEXT} ${ICON_BRAIN} %s ${ICON_MONITOR} %s %d%% ${ICON_DOLLAR} %s ${RESET}" "$model_display" "$bar" "$context_pct" "$cost_display"
+printf "${FG_RIGHT}${CAP_RIGHT}${RESET}"
 
 printf "\n"
