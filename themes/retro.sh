@@ -1,9 +1,5 @@
-#!/bin/bash
-
 # CC CHIPS — Retro theme
 # Pink and lime
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Left chip:   bg #C41665 (pink), text #DDDDDD
 FG_LEFT="\033[38;2;196;22;101m"
@@ -19,5 +15,3 @@ FG_MID_TEXT="\033[38;2;0;0;0m"
 FG_RIGHT="\033[38;2;156;192;42m"
 BG_RIGHT="\033[48;2;156;192;42m"
 FG_RIGHT_TEXT="\033[38;2;0;0;0m"
-
-source "${SCRIPT_DIR}/engine.sh" 2>/dev/null || source "$SCRIPT_DIR/../engine.sh"

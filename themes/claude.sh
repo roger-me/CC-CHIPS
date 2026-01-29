@@ -1,9 +1,5 @@
-#!/bin/bash
-
 # CC CHIPS — Claude theme
 # Terracotta and white
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Left chip:   bg #2D2E29, text #C6613F
 FG_LEFT="\033[38;2;31;30;29m"
@@ -19,5 +15,3 @@ FG_MID_TEXT="\033[38;2;46;52;64m"
 FG_RIGHT="\033[38;2;198;97;63m"
 BG_RIGHT="\033[48;2;198;97;63m"
 FG_RIGHT_TEXT="\033[38;2;255;255;255m"
-
-source "${SCRIPT_DIR}/engine.sh" 2>/dev/null || source "$SCRIPT_DIR/../engine.sh"

@@ -1,12 +1,19 @@
 #!/bin/bash
 
-# CC CHIPS — Shared rendering engine
-# Sourced by theme files after they define color variables.
-#
-# Expected variables from theme:
-#   FG_LEFT, BG_LEFT, FG_LEFT_TEXT
-#   FG_MID, BG_MID, FG_MID_TEXT
-#   FG_RIGHT, BG_RIGHT, FG_RIGHT_TEXT
+# CC CHIPS — Rendering engine for Claude Code status lines
+# Set CC_CHIPS_THEME to pick a theme (claude, cool, retro, cyber).
+# Defaults to claude.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+THEME="${CC_CHIPS_THEME:-claude}"
+
+# Load theme colors
+THEME_FILE="${SCRIPT_DIR}/themes/${THEME}.sh"
+if [ ! -f "$THEME_FILE" ]; then
+    echo "CC CHIPS: theme '${THEME}' not found at ${THEME_FILE}" >&2
+    exit 1
+fi
+source "$THEME_FILE"
 
 input=$(cat)
 

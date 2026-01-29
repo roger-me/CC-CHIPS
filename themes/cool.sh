@@ -1,9 +1,5 @@
-#!/bin/bash
-
 # CC CHIPS — Cool theme
 # Blue and orange
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Left chip:   bg #008BB7 (blue), text white
 FG_LEFT="\033[38;2;0;139;183m"
@@ -19,5 +15,3 @@ FG_MID_TEXT="\033[38;2;0;219;0m"
 FG_RIGHT="\033[38;2;255;77;0m"
 BG_RIGHT="\033[48;2;255;77;0m"
 FG_RIGHT_TEXT="\033[97m"
-
-source "${SCRIPT_DIR}/engine.sh" 2>/dev/null || source "$SCRIPT_DIR/../engine.sh"

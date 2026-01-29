@@ -1,9 +1,5 @@
-#!/bin/bash
-
 # CC CHIPS — Cyber theme
 # Teal, yellow, and crimson
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Left chip:   bg #FFF700 (yellow), text #000000
 FG_LEFT="\033[38;2;255;247;0m"
@@ -19,5 +15,3 @@ FG_MID_TEXT="\033[38;2;100;204;194m"
 FG_RIGHT="\033[38;2;70;21;31m"
 BG_RIGHT="\033[48;2;70;21;31m"
 FG_RIGHT_TEXT="\033[38;2;247;80;74m"
-
-source "${SCRIPT_DIR}/engine.sh" 2>/dev/null || source "$SCRIPT_DIR/../engine.sh"
