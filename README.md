@@ -29,16 +29,17 @@ Chip-style status line themes for Claude Code with Powerline pills, Nerd Font ic
 
 ## Installation
 
-1. Download a theme from the [Releases](https://github.com/roger-me/CC-CHIPS/releases) page or copy one from the `themes/` directory:
+1. Copy `engine.sh` and your chosen theme to `~/.claude/`:
 
 ```bash
+cp engine.sh ~/.claude/engine.sh
 cp themes/claude.sh ~/.claude/statusline.sh
 ```
 
-2. Make it executable:
+2. Make them executable:
 
 ```bash
-chmod +x ~/.claude/statusline.sh
+chmod +x ~/.claude/engine.sh ~/.claude/statusline.sh
 ```
 
 3. Add to your Claude Code settings (`~/.claude/settings.json`):
@@ -56,7 +57,7 @@ chmod +x ~/.claude/statusline.sh
 
 ## Switching Themes
 
-Replace the script file and Claude Code picks it up automatically:
+Replace the theme file — the engine stays the same:
 
 ```bash
 cp themes/cyber.sh ~/.claude/statusline.sh
@@ -72,6 +73,4 @@ No restart needed.
 cp themes/cool.sh themes/mytheme.sh
 ```
 
-2. Edit only the `COLORS` section at the top of the file -- change the `FG_*` and `BG_*` values.
-
-All data extraction and layout logic stays the same.
+2. Edit the 9 color variables (`FG_LEFT`, `BG_LEFT`, `FG_LEFT_TEXT`, etc.) to your palette. Each theme is ~20 lines -- the shared rendering logic lives in `engine.sh`.
