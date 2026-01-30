@@ -32,6 +32,8 @@ ICON_BRANCH=$(printf '\xee\x9c\xa5')        # U+E725  dev-git_branch
 ICON_BRAIN=$(printf '\xf3\xb0\xaf\x89')     # U+F0BC9 nf-md-space_invaders
 ICON_MONITOR=$(printf '\xef\x8b\x90')       # U+F2D0  fa-window_maximize
 ICON_DOLLAR=$(printf '\xee\xb7\xa8')         # U+EDE8  fa-coins
+ICON_ARROW_UP=$(printf '\xef\x81\xa2')       # U+F062  fa-arrow_up
+ICON_ARROW_DOWN=$(printf '\xef\x81\xa3')     # U+F063  fa-arrow_down
 
 BOLD="\033[1m"
 RESET="\033[0m"
@@ -99,6 +101,33 @@ for ((i=0; i<5; i++)); do
 done
 
 # ═══════════════════════════════════════════════════════════════════
+# API TOKEN USAGE
+# ═══════════════════════════════════════════════════════════════════
+format_tokens() {
+    local t=$1
+    if [ "$t" -ge 1000000 ]; then
+        local m=$((t / 1000000))
+        local d=$(( (t % 1000000) / 100000 ))
+        printf '%d.%dM' "$m" "$d"
+    elif [ "$t" -ge 1000 ]; then
+        local k=$((t / 1000))
+        local d=$(( (t % 1000) / 100 ))
+        if [ "$k" -ge 10 ]; then
+            printf '%dK' "$k"
+        else
+            printf '%d.%dK' "$k" "$d"
+        fi
+    else
+        printf '%d' "$t"
+    fi
+}
+
+total_in=$((input_tokens + cache_read + cache_write))
+total_out=$output_tokens
+usage_in=$(format_tokens $total_in)
+usage_out=$(format_tokens $total_out)
+
+# ═══════════════════════════════════════════════════════════════════
 # COST (Opus 4.5: $15/M in, $75/M out, $1.50/M cache read, $18.75/M cache write)
 # ═══════════════════════════════════════════════════════════════════
 cost_input_cents=$(( (input_tokens * 1500) / 1000000 ))
@@ -138,7 +167,7 @@ printf " "
 
 # CHIP 3: model + context + cost
 printf "${FG_RIGHT}${CAP_LEFT}${RESET}"
-printf "${BG_RIGHT}${BOLD}${FG_RIGHT_TEXT} ${ICON_BRAIN} %s ${ICON_MONITOR} %s %d%% ${ICON_DOLLAR} %s ${RESET}" "$model_display" "$bar" "$context_pct" "$cost_display"
+printf "${BG_RIGHT}${BOLD}${FG_RIGHT_TEXT} ${ICON_BRAIN} %s ${ICON_MONITOR} %s %d%% ${ICON_ARROW_UP} %s ${ICON_ARROW_DOWN} %s ${ICON_DOLLAR} %s ${RESET}" "$model_display" "$bar" "$context_pct" "$usage_in" "$usage_out" "$cost_display"
 printf "${FG_RIGHT}${CAP_RIGHT}${RESET}"
 
 printf "\n"
