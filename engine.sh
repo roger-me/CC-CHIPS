@@ -31,7 +31,7 @@ ICON_GITHUB=$(printf '\xef\x82\x9b')        # U+F09B  github
 ICON_BRANCH=$(printf '\xee\x9c\xa5')        # U+E725  dev-git_branch
 ICON_BRAIN=$(printf '\xf3\xb0\xaf\x89')     # U+F0BC9 nf-md-space_invaders
 ICON_MONITOR=$(printf '\xef\x8b\x90')       # U+F2D0  fa-window_maximize
-ICON_DOLLAR=$(printf '\xee\xb7\xa8')         # U+EDE8  fa-coins
+ICON_CLOCK=$(printf '\xef\x80\x97')          # U+F017  fa-clock
 
 BOLD="\033[1m"
 RESET="\033[0m"
@@ -61,9 +61,12 @@ fi
 # ═══════════════════════════════════════════════════════════════════
 model=$(echo "$input" | jq -r '.model // "unknown"')
 case "$model" in
+    *opus*4.6*|*opus-4-6*) model_display="Opus 4.6" ;;
     *opus*4.5*|*opus-4-5*) model_display="Opus 4.5" ;;
     *opus*4*|*opus-4*) model_display="Opus 4" ;;
+    *sonnet*4.5*|*sonnet-4-5*) model_display="Sonnet 4.5" ;;
     *sonnet*4*|*sonnet-4*) model_display="Sonnet 4" ;;
+    *haiku*4.5*|*haiku-4-5*) model_display="Haiku 4.5" ;;
     *sonnet*3.5*|*sonnet-3-5*) model_display="Sonnet 3.5" ;;
     *haiku*3.5*|*haiku-3-5*) model_display="Haiku 3.5" ;;
     *) model_display="$model" ;;
@@ -99,25 +102,6 @@ for ((i=0; i<5; i++)); do
 done
 
 # ═══════════════════════════════════════════════════════════════════
-# COST (Opus 4.5: $15/M in, $75/M out, $1.50/M cache read, $18.75/M cache write)
-# ═══════════════════════════════════════════════════════════════════
-cost_input_cents=$(( (input_tokens * 1500) / 1000000 ))
-cost_output_cents=$(( (output_tokens * 7500) / 1000000 ))
-cost_cache_read_cents=$(( (cache_read * 150) / 1000000 ))
-cost_cache_write_cents=$(( (cache_write * 1875) / 1000000 ))
-total_cents=$((cost_input_cents + cost_output_cents + cost_cache_read_cents + cost_cache_write_cents))
-
-if [ $total_cents -eq 0 ]; then
-    cost_display="\$0"
-elif [ $total_cents -lt 100 ]; then
-    cost_display="\$0.$(printf '%02d' $total_cents)"
-else
-    dollars=$((total_cents / 100))
-    cents=$((total_cents % 100))
-    cost_display="\$${dollars}.$(printf '%02d' $cents)"
-fi
-
-# ═══════════════════════════════════════════════════════════════════
 # BUILD STATUS LINE
 # ═══════════════════════════════════════════════════════════════════
 
@@ -138,7 +122,8 @@ printf " "
 
 # CHIP 3: model + context + cost
 printf "${FG_RIGHT}${CAP_LEFT}${RESET}"
-printf "${BG_RIGHT}${BOLD}${FG_RIGHT_TEXT} ${ICON_BRAIN} %s ${ICON_MONITOR} %s %d%% ${ICON_DOLLAR} %s ${RESET}" "$model_display" "$bar" "$context_pct" "$cost_display"
+current_time=$(date +"%H:%M")
+printf "${BG_RIGHT}${BOLD}${FG_RIGHT_TEXT} ${ICON_BRAIN} %s ${ICON_MONITOR} %s %d%% ${ICON_CLOCK} %s ${RESET}" "$model_display" "$bar" "$context_pct" "$current_time"
 printf "${FG_RIGHT}${CAP_RIGHT}${RESET}"
 
 printf "\n"

@@ -26,7 +26,7 @@ Each theme file defines 9 color variables:
 
 - **Chip 1** (left): Folder icon + project path
 - **Chip 2** (middle, git only): GitHub icon + branch icon + branch name + dirty indicator
-- **Chip 3** (right): Space invader + model name + window icon + context bar % + coins icon + cost
+- **Chip 3** (right): Space invader + model name + window icon + context bar % + clock icon + time
 
 ### Dependencies
 
@@ -43,7 +43,7 @@ Each theme file defines 9 color variables:
 | Branch | U+E725 | dev-git_branch |
 | Model | U+F0BC9 | nf-md-space_invaders |
 | Context | U+F2D0 | fa-window_maximize |
-| Cost | U+EDE8 | fa-coins |
+| Clock | U+F017 | fa-clock |
 
 ## Creating a New Theme
 
