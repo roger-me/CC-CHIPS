@@ -59,18 +59,29 @@ fi
 # ═══════════════════════════════════════════════════════════════════
 # MODEL
 # ═══════════════════════════════════════════════════════════════════
-model=$(echo "$input" | jq -r '.model // "unknown"')
-case "$model" in
-    *opus*4.6*|*opus-4-6*) model_display="Opus 4.6" ;;
-    *opus*4.5*|*opus-4-5*) model_display="Opus 4.5" ;;
-    *opus*4*|*opus-4*) model_display="Opus 4" ;;
-    *sonnet*4.5*|*sonnet-4-5*) model_display="Sonnet 4.5" ;;
-    *sonnet*4*|*sonnet-4*) model_display="Sonnet 4" ;;
-    *haiku*4.5*|*haiku-4-5*) model_display="Haiku 4.5" ;;
-    *sonnet*3.5*|*sonnet-3-5*) model_display="Sonnet 3.5" ;;
-    *haiku*3.5*|*haiku-3-5*) model_display="Haiku 3.5" ;;
-    *) model_display="$model" ;;
-esac
+# .model may be an object {id, display_name} or a plain string
+model_display=$(echo "$input" | jq -r '
+    if (.model | type) == "object" then
+        .model.display_name // .model.id // "unknown"
+    else
+        .model // "unknown"
+    end
+')
+
+# If we got a raw model ID (e.g. claude-sonnet-4-6), make it human-readable
+if [[ "$model_display" == claude-* ]]; then
+    _m="${model_display#claude-}"
+    _m="${_m%-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]}"
+    if [[ "$_m" =~ ^([a-z]+)-([0-9]+)-([0-9]+) ]]; then
+        _family="${BASH_REMATCH[1]}"
+        _family="$(printf '%s' "${_family:0:1}" | tr '[:lower:]' '[:upper:]')${_family:1}"
+        model_display="${_family} ${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+    elif [[ "$_m" =~ ^([a-z]+)-([0-9]+) ]]; then
+        _family="${BASH_REMATCH[1]}"
+        _family="$(printf '%s' "${_family:0:1}" | tr '[:lower:]' '[:upper:]')${_family:1}"
+        model_display="${_family} ${BASH_REMATCH[2]}"
+    fi
+fi
 
 # ═══════════════════════════════════════════════════════════════════
 # CONTEXT WINDOW
