@@ -32,9 +32,145 @@ ICON_BRANCH=$(printf '\xee\x9c\xa5')        # U+E725  dev-git_branch
 ICON_BRAIN=$(printf '\xf3\xb0\xaf\x89')     # U+F0BC9 nf-md-space_invaders
 ICON_MONITOR=$(printf '\xef\x8b\x90')       # U+F2D0  fa-window_maximize
 ICON_CLOCK=$(printf '\xef\x80\x97')          # U+F017  fa-clock
+ICON_HOURGLASS=$(printf '\xef\x89\x93')     # U+F253  fa-hourglass-half
+ICON_CALENDAR=$(printf '\xef\x81\xb3')      # U+F073  fa-calendar
 
 BOLD="\033[1m"
 RESET="\033[0m"
+DIM="\033[2m"
+
+# ═══════════════════════════════════════════════════════════════════
+# OAUTH TOKEN RESOLUTION
+# ═══════════════════════════════════════════════════════════════════
+_parse_oauth_token() {
+    local blob="$1"
+    [ -z "$blob" ] && return 1
+    local token
+    token=$(echo "$blob" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+    if [ -n "$token" ] && [ "$token" != "null" ]; then
+        echo "$token"
+        return 0
+    fi
+    return 1
+}
+
+get_oauth_token() {
+    # 1. Explicit env var override
+    if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+        echo "$CLAUDE_CODE_OAUTH_TOKEN"
+        return 0
+    fi
+    # 2. macOS Keychain
+    if command -v security >/dev/null 2>&1; then
+        _parse_oauth_token "$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null)" && return 0
+    fi
+    # 3. Linux credentials file
+    if [ -f "${HOME}/.claude/.credentials.json" ]; then
+        _parse_oauth_token "$(cat "${HOME}/.claude/.credentials.json" 2>/dev/null)" && return 0
+    fi
+    # 4. GNOME Keyring via secret-tool
+    if command -v secret-tool >/dev/null 2>&1; then
+        _parse_oauth_token "$(timeout 2 secret-tool lookup service "Claude Code-credentials" 2>/dev/null)" && return 0
+    fi
+    echo ""
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# USAGE API (5h / weekly / extra)
+# ═══════════════════════════════════════════════════════════════════
+USAGE_CACHE="/tmp/claude/statusline-usage-cache.json"
+USAGE_CACHE_MAX_AGE=30
+
+fetch_usage_data() {
+    local usage_data=""
+
+    # Serve from cache if fresh enough
+    if [ -f "$USAGE_CACHE" ]; then
+        local cache_mtime now
+        cache_mtime=$(stat -f %m "$USAGE_CACHE" 2>/dev/null || stat -c %Y "$USAGE_CACHE" 2>/dev/null)
+        now=$(date +%s)
+        if [ $(( now - cache_mtime )) -lt "$USAGE_CACHE_MAX_AGE" ]; then
+            cat "$USAGE_CACHE" 2>/dev/null
+            return
+        fi
+        # Keep stale data as fallback
+        usage_data=$(cat "$USAGE_CACHE" 2>/dev/null)
+    fi
+
+    # Refresh from API
+    mkdir -p /tmp/claude
+    local token
+    token=$(get_oauth_token)
+    if [ -n "$token" ] && [ "$token" != "null" ]; then
+        local response
+        response=$(curl -s --max-time 5 \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $token" \
+            -H "anthropic-beta: oauth-2025-04-20" \
+            "https://api.anthropic.com/api/oauth/usage" 2>/dev/null)
+        if [ -n "$response" ] && echo "$response" | jq -e '.five_hour' >/dev/null 2>&1; then
+            usage_data="$response"
+            echo "$response" > "$USAGE_CACHE"
+        fi
+    fi
+
+    echo "$usage_data"
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# DATE HELPERS
+# ═══════════════════════════════════════════════════════════════════
+iso_to_epoch() {
+    local iso_str="$1"
+    local epoch
+    # Try GNU date first (Linux)
+    epoch=$(date -d "${iso_str}" +%s 2>/dev/null)
+    if [ -n "$epoch" ]; then echo "$epoch"; return 0; fi
+    # BSD date (macOS)
+    local stripped="${iso_str%%.*}"
+    stripped="${stripped%%Z}"
+    stripped="${stripped%%+*}"
+    if [[ "$iso_str" == *"Z"* ]] || [[ "$iso_str" == *"+00:00"* ]]; then
+        epoch=$(env TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%S" "$stripped" +%s 2>/dev/null)
+    else
+        epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "$stripped" +%s 2>/dev/null)
+    fi
+    if [ -n "$epoch" ]; then echo "$epoch"; return 0; fi
+    return 1
+}
+
+format_reset_time() {
+    local iso_str="$1"
+    [ -z "$iso_str" ] || [ "$iso_str" = "null" ] && return
+    local epoch
+    epoch=$(iso_to_epoch "$iso_str")
+    [ -z "$epoch" ] && return
+    # Format: "H:MM, DayOfWeek, DD/MM/YYYY" (force English)
+    # Try BSD date (macOS) first, then GNU date (Linux)
+    LC_TIME=en_US.UTF-8 date -j -r "$epoch" +"%-H:%M, %A, %d/%m/%Y" 2>/dev/null || \
+    LC_TIME=en_US.UTF-8 date -d "@$epoch" +"%-H:%M, %A, %d/%m/%Y" 2>/dev/null
+}
+
+# Build a usage bar with color that shifts based on percentage.
+# Usage: build_usage_bar <pct> <width>
+build_usage_bar() {
+    local pct=$1 width=$2
+    [ "$pct" -lt 0 ] 2>/dev/null && pct=0
+    [ "$pct" -gt 100 ] 2>/dev/null && pct=100
+    local filled=$(( pct * width / 100 ))
+    local empty=$(( width - filled ))
+    local bar_color
+    if [ "$pct" -ge 90 ]; then bar_color="\033[38;2;255;85;85m"
+    elif [ "$pct" -ge 70 ]; then bar_color="\033[38;2;230;200;0m"
+    elif [ "$pct" -ge 50 ]; then bar_color="\033[38;2;255;176;85m"
+    else bar_color="\033[38;2;0;160;0m"
+    fi
+    local filled_str="" empty_str=""
+    for ((i=0; i<filled; i++)); do filled_str+="●"; done
+    for ((i=0; i<empty; i++)); do empty_str+="○"; done
+    printf "${bar_color}${filled_str}${DIM}${empty_str}${RESET}"
+}
 
 # ═══════════════════════════════════════════════════════════════════
 # EXTRACT DATA
@@ -105,11 +241,11 @@ if [ "$usage" != "null" ]; then
     fi
 fi
 
-# Context bar (5 blocks)
+# Context bar (5 blocks, plain text for chip embedding)
 filled=$((context_pct * 5 / 100))
 bar=""
 for ((i=0; i<5; i++)); do
-    if [ $i -lt $filled ]; then bar="${bar}■"; else bar="${bar}□"; fi
+    if [ $i -lt $filled ]; then bar="${bar}●"; else bar="${bar}○"; fi
 done
 
 # ═══════════════════════════════════════════════════════════════════
@@ -136,5 +272,39 @@ printf "${FG_RIGHT}${CAP_LEFT}${RESET}"
 current_time=$(date +"%H:%M")
 printf "${BG_RIGHT}${BOLD}${FG_RIGHT_TEXT} ${ICON_BRAIN} %s ${ICON_MONITOR} %s %d%% ${ICON_CLOCK} %s ${RESET}" "$model_display" "$bar" "$context_pct" "$current_time"
 printf "${FG_RIGHT}${CAP_RIGHT}${RESET}"
+
+# ═══════════════════════════════════════════════════════════════════
+# ROW 2: USAGE CHIPS (5h / weekly / extra)
+# ═══════════════════════════════════════════════════════════════════
+api_usage=$(fetch_usage_data)
+
+COLOR_WHITE="\033[38;2;220;220;220m"
+
+render_usage_row() {
+    local label="$1" pct="$2" reset_time="$3" width=20
+    local usage_bar
+    usage_bar=$(build_usage_bar "$pct" "$width")
+    printf "\n${COLOR_WHITE}${BOLD}%-8s${RESET} " "$label"
+    printf "%b" "$usage_bar"
+    printf "${COLOR_WHITE}  %3s%% used ${DIM}|${RESET} ${COLOR_WHITE}Resets: %s${RESET}" "$pct" "$reset_time"
+}
+
+if [ -n "$api_usage" ]; then
+    # Extract all fields in one jq call
+    usage_fields=$(echo "$api_usage" | jq -r '
+        [.five_hour.utilization // 0, .five_hour.resets_at // "",
+         .seven_day.utilization // 0, .seven_day.resets_at // ""]
+        | map(tostring) | join("\t")
+    ' 2>/dev/null)
+
+    if [ -n "$usage_fields" ]; then
+        IFS=$'\t' read -r fh_util fh_reset sd_util sd_reset <<< "$usage_fields"
+        five_hour_pct=$(awk "BEGIN {printf \"%.0f\", $fh_util}")
+        seven_day_pct=$(awk "BEGIN {printf \"%.0f\", $sd_util}")
+
+        render_usage_row "Current:" "$five_hour_pct" "$(format_reset_time "$fh_reset")"
+        render_usage_row "Weekly:" "$seven_day_pct" "$(format_reset_time "$sd_reset")"
+    fi
+fi
 
 printf "\n"
