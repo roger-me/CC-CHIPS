@@ -24,7 +24,7 @@ Each theme file defines 9 color variables:
 
 ### Chip Layout
 
-- **Chip 1** (left): Folder icon + project path
+- **Chip 1** (left): Folder icon + project folder name
 - **Chip 2** (middle, git only): GitHub icon + branch icon + branch name + dirty indicator
 - **Chip 3** (right): Space invader + model name + window icon + context bar % + clock icon + time
 
