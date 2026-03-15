@@ -79,26 +79,22 @@ get_oauth_token() {
 # USAGE API (5h / weekly / extra)
 # ═══════════════════════════════════════════════════════════════════
 USAGE_CACHE="/tmp/claude/statusline-usage-cache.json"
-USAGE_CACHE_MAX_AGE=30
+USAGE_CACHE_LOCK="/tmp/claude/statusline-usage-refresh.lock"
+USAGE_CACHE_MAX_AGE=60
 
-fetch_usage_data() {
-    local usage_data=""
-
-    # Serve from cache if fresh enough
-    if [ -f "$USAGE_CACHE" ]; then
-        local cache_mtime now
-        cache_mtime=$(stat -f %m "$USAGE_CACHE" 2>/dev/null || stat -c %Y "$USAGE_CACHE" 2>/dev/null)
+_refresh_usage_cache() {
+    # Lock to prevent concurrent refreshes
+    if [ -f "$USAGE_CACHE_LOCK" ]; then
+        local lock_age lock_mtime now
+        lock_mtime=$(stat -f %m "$USAGE_CACHE_LOCK" 2>/dev/null || stat -c %Y "$USAGE_CACHE_LOCK" 2>/dev/null)
         now=$(date +%s)
-        if [ $(( now - cache_mtime )) -lt "$USAGE_CACHE_MAX_AGE" ]; then
-            cat "$USAGE_CACHE" 2>/dev/null
-            return
-        fi
-        # Keep stale data as fallback
-        usage_data=$(cat "$USAGE_CACHE" 2>/dev/null)
+        lock_age=$(( now - lock_mtime ))
+        # Stale lock (>15s) means a previous refresh died, remove it
+        [ "$lock_age" -lt 15 ] && return
     fi
+    echo $$ > "$USAGE_CACHE_LOCK"
+    trap 'rm -f "$USAGE_CACHE_LOCK"' EXIT
 
-    # Refresh from API
-    mkdir -p /tmp/claude
     local token
     token=$(get_oauth_token)
     if [ -n "$token" ] && [ "$token" != "null" ]; then
@@ -110,12 +106,50 @@ fetch_usage_data() {
             -H "anthropic-beta: oauth-2025-04-20" \
             "https://api.anthropic.com/api/oauth/usage" 2>/dev/null)
         if [ -n "$response" ] && echo "$response" | jq -e '.five_hour' >/dev/null 2>&1; then
-            usage_data="$response"
             echo "$response" > "$USAGE_CACHE"
+        else
+            # Touch cache so we don't retry every render on persistent failures
+            touch "$USAGE_CACHE" 2>/dev/null
         fi
+    else
+        touch "$USAGE_CACHE" 2>/dev/null
+    fi
+    rm -f "$USAGE_CACHE_LOCK"
+}
+
+fetch_usage_data() {
+    mkdir -p /tmp/claude
+
+    if [ -f "$USAGE_CACHE" ]; then
+        local cache_mtime now
+        cache_mtime=$(stat -f %m "$USAGE_CACHE" 2>/dev/null || stat -c %Y "$USAGE_CACHE" 2>/dev/null)
+        now=$(date +%s)
+        if [ $(( now - cache_mtime )) -ge "$USAGE_CACHE_MAX_AGE" ]; then
+            # Stale: kick off background refresh, serve stale data now
+            _refresh_usage_cache &
+            disown 2>/dev/null
+        fi
+        cat "$USAGE_CACHE" 2>/dev/null
+        return
     fi
 
-    echo "$usage_data"
+    # No cache at all: synchronous first fetch (unavoidable)
+    local token
+    token=$(get_oauth_token)
+    if [ -n "$token" ] && [ "$token" != "null" ]; then
+        local response
+        response=$(curl -s --max-time 3 \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $token" \
+            -H "anthropic-beta: oauth-2025-04-20" \
+            "https://api.anthropic.com/api/oauth/usage" 2>/dev/null)
+        if [ -n "$response" ] && echo "$response" | jq -e '.five_hour' >/dev/null 2>&1; then
+            echo "$response" > "$USAGE_CACHE"
+            echo "$response"
+            return
+        fi
+    fi
 }
 
 # ═══════════════════════════════════════════════════════════════════
@@ -160,16 +194,22 @@ build_usage_bar() {
     [ "$pct" -gt 100 ] 2>/dev/null && pct=100
     local filled=$(( pct * width / 100 ))
     local empty=$(( width - filled ))
-    local bar_color
-    if [ "$pct" -ge 90 ]; then bar_color="\033[38;2;255;85;85m"
-    elif [ "$pct" -ge 70 ]; then bar_color="\033[38;2;230;200;0m"
-    elif [ "$pct" -ge 50 ]; then bar_color="\033[38;2;255;176;85m"
-    else bar_color="\033[38;2;0;160;0m"
-    fi
-    local filled_str="" empty_str=""
-    for ((i=0; i<filled; i++)); do filled_str+="●"; done
-    for ((i=0; i<empty; i++)); do empty_str+="○"; done
-    printf "${bar_color}${filled_str}${DIM}${empty_str}${RESET}"
+    local COLOR_GREEN="\033[38;2;0;160;0m"
+    local COLOR_ORANGE="\033[38;2;255;176;85m"
+    local COLOR_RED="\033[38;2;255;85;85m"
+    local COLOR_EMPTY="\033[38;2;80;80;80m"
+    local bar=""
+    for ((i=1; i<=width; i++)); do
+        if [ $i -le $filled ]; then
+            if [ $i -le 4 ]; then bar+="${COLOR_GREEN}●"
+            elif [ $i -le 7 ]; then bar+="${COLOR_ORANGE}●"
+            else bar+="${COLOR_RED}●"
+            fi
+        else
+            bar+="${COLOR_EMPTY}○"
+        fi
+    done
+    printf "%b${RESET}" "$bar"
 }
 
 # ═══════════════════════════════════════════════════════════════════
@@ -269,8 +309,7 @@ printf " "
 
 # CHIP 3: model + context + cost
 printf "${FG_RIGHT}${CAP_LEFT}${RESET}"
-current_time=$(date +"%H:%M")
-printf "${BG_RIGHT}${BOLD}${FG_RIGHT_TEXT} ${ICON_BRAIN} %s ${ICON_MONITOR} %s %d%% ${ICON_CLOCK} %s ${RESET}" "$model_display" "$bar" "$context_pct" "$current_time"
+printf "${BG_RIGHT}${BOLD}${FG_RIGHT_TEXT} ${ICON_BRAIN} %s ${ICON_MONITOR} %s %d%% ${RESET}" "$model_display" "$bar" "$context_pct"
 printf "${FG_RIGHT}${CAP_RIGHT}${RESET}"
 
 # ═══════════════════════════════════════════════════════════════════
@@ -281,12 +320,12 @@ api_usage=$(fetch_usage_data)
 COLOR_WHITE="\033[38;2;220;220;220m"
 
 render_usage_row() {
-    local label="$1" pct="$2" reset_time="$3" width=20
+    local label="$1" pct="$2" reset_time="$3" width=10
     local usage_bar
     usage_bar=$(build_usage_bar "$pct" "$width")
     printf "\n${COLOR_WHITE}${BOLD}%-8s${RESET} " "$label"
     printf "%b" "$usage_bar"
-    printf "${COLOR_WHITE}  %3s%% used ${DIM}|${RESET} ${COLOR_WHITE}Resets: %s${RESET}" "$pct" "$reset_time"
+    printf "${COLOR_WHITE}%3s%% used ${DIM}|${RESET} ${COLOR_WHITE}Resets: %s${RESET}" "$pct" "$reset_time"
 }
 
 if [ -n "$api_usage" ]; then
