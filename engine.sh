@@ -81,6 +81,7 @@ get_oauth_token() {
 USAGE_CACHE="/tmp/claude/statusline-usage-cache.json"
 USAGE_CACHE_LOCK="/tmp/claude/statusline-usage-refresh.lock"
 USAGE_CACHE_MAX_AGE=60
+USAGE_CACHE_HARD_STALE=300  # After 5 min (e.g. sleep/wake), force synchronous refresh
 
 _refresh_usage_cache() {
     # Lock to prevent concurrent refreshes
@@ -121,11 +122,15 @@ fetch_usage_data() {
     mkdir -p /tmp/claude
 
     if [ -f "$USAGE_CACHE" ]; then
-        local cache_mtime now
+        local cache_mtime now cache_age
         cache_mtime=$(stat -f %m "$USAGE_CACHE" 2>/dev/null || stat -c %Y "$USAGE_CACHE" 2>/dev/null)
         now=$(date +%s)
-        if [ $(( now - cache_mtime )) -ge "$USAGE_CACHE_MAX_AGE" ]; then
-            # Stale: kick off background refresh, serve stale data now
+        cache_age=$(( now - cache_mtime ))
+        if [ "$cache_age" -ge "$USAGE_CACHE_HARD_STALE" ]; then
+            # Very stale (sleep/wake): synchronous refresh for fresh data
+            _refresh_usage_cache
+        elif [ "$cache_age" -ge "$USAGE_CACHE_MAX_AGE" ]; then
+            # Mildly stale: background refresh, serve cached data now
             _refresh_usage_cache &
             disown 2>/dev/null
         fi
