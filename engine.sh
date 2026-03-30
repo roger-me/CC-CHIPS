@@ -118,6 +118,22 @@ _refresh_usage_cache() {
     rm -f "$USAGE_CACHE_LOCK"
 }
 
+_cache_past_reset() {
+    # Check if either resets_at timestamp in the cache is in the past
+    [ ! -f "$USAGE_CACHE" ] && return 1
+    local now resets
+    now=$(date +%s)
+    resets=$(jq -r '[.five_hour.resets_at // "", .seven_day.resets_at // ""] | .[]' "$USAGE_CACHE" 2>/dev/null)
+    [ -z "$resets" ] && return 1
+    local ts epoch
+    while IFS= read -r ts; do
+        [ -z "$ts" ] || [ "$ts" = "null" ] && continue
+        epoch=$(iso_to_epoch "$ts") || continue
+        [ "$now" -ge "$epoch" ] && return 0
+    done <<< "$resets"
+    return 1
+}
+
 fetch_usage_data() {
     mkdir -p /tmp/claude
 
@@ -126,8 +142,8 @@ fetch_usage_data() {
         cache_mtime=$(stat -f %m "$USAGE_CACHE" 2>/dev/null || stat -c %Y "$USAGE_CACHE" 2>/dev/null)
         now=$(date +%s)
         cache_age=$(( now - cache_mtime ))
-        if [ "$cache_age" -ge "$USAGE_CACHE_HARD_STALE" ]; then
-            # Very stale (sleep/wake): synchronous refresh for fresh data
+        if [ "$cache_age" -ge "$USAGE_CACHE_HARD_STALE" ] || _cache_past_reset; then
+            # Very stale or reset boundary passed: synchronous refresh for fresh data
             _refresh_usage_cache
         elif [ "$cache_age" -ge "$USAGE_CACHE_MAX_AGE" ]; then
             # Mildly stale: background refresh, serve cached data now
@@ -203,13 +219,15 @@ build_usage_bar() {
     local COLOR_ORANGE="\033[38;2;255;176;85m"
     local COLOR_RED="\033[38;2;255;85;85m"
     local COLOR_EMPTY="\033[38;2;80;80;80m"
+    local COLOR_FILL
+    if [ "$pct" -lt 50 ]; then COLOR_FILL="$COLOR_GREEN"
+    elif [ "$pct" -lt 80 ]; then COLOR_FILL="$COLOR_ORANGE"
+    else COLOR_FILL="$COLOR_RED"
+    fi
     local bar=""
     for ((i=1; i<=width; i++)); do
         if [ $i -le $filled ]; then
-            if [ $i -le 4 ]; then bar+="${COLOR_GREEN}●"
-            elif [ $i -le 7 ]; then bar+="${COLOR_ORANGE}●"
-            else bar+="${COLOR_RED}●"
-            fi
+            bar+="${COLOR_FILL}●"
         else
             bar+="${COLOR_EMPTY}○"
         fi
